@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Municipal Grievance Admin Portal | Local Panchayat & Corporation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Leaflet CSS for Interactive Map -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- Top Navigation Bar -->
+  <header class="admin-header">
+    <div class="header-left">
+      <div class="civic-emblem">🏛️</div>
+      <div>
+        <h1 class="portal-title">Civic Grievance Cell</h1>
+        <p class="portal-sub">Municipal Administration & Panchayat Resolution Portal</p>
+      </div>
+    </div>
+
+    <div class="header-right" id="headerAuthSection">
+      <!-- Injected dynamically via JS: Login button or Staff Profile -->
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <div class="app-container">
+    
+    <!-- Login Modal (Hidden by default when logged in) -->
+    <div id="loginModal" class="modal-overlay">
+      <div class="modal-card">
+        <div class="modal-badge">Staff Authentication</div>
+        <h2>Municipal Staff Sign In</h2>
+        <p class="modal-desc">Access corporation grievance dispatch, field worker assignments, and status resolution.</p>
+        
+        <form id="adminLoginForm">
+          <div class="form-group">
+            <label for="adminEmail">Official Email</label>
+            <input type="email" id="adminEmail" value="admin@panchayat.gov" required placeholder="name@panchayat.gov">
+          </div>
+          <div class="form-group">
+            <label for="adminPassword">Password</label>
+            <input type="password" id="adminPassword" value="admin123" required placeholder="••••••••">
+          </div>
+          <div class="quick-demo-hint">
+            💡 <strong>Demo Credentials:</strong> <code>admin@panchayat.gov</code> / <code>admin123</code>
+          </div>
+          <div id="loginError" class="alert-box error hidden"></div>
+          <button type="submit" id="loginBtn" class="btn btn-primary btn-full">
+            <span>Sign In to Dashboard</span>
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toastNotification" class="toast-container hidden">
+      <div class="toast-icon" id="toastIcon">🔔</div>
+      <div class="toast-body">
+        <div class="toast-title" id="toastTitle">Notification</div>
+        <div class="toast-msg" id="toastMsg">Status updated successfully.</div>
+      </div>
+    </div>
+
+    <!-- Dashboard Content -->
+    <main class="dashboard-main" id="dashboardContent">
+      
+      <!-- Real-time Stat Cards -->
+      <section class="stat-cards-grid">
+        <div class="stat-card">
+          <div class="stat-icon-wrapper total-icon">📋</div>
+          <div>
+            <span class="stat-label">Total Grievances</span>
+            <div class="stat-value" id="statTotal">-</div>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon-wrapper pending-icon">⏳</div>
+          <div>
+            <span class="stat-label">Pending Action</span>
+            <div class="stat-value text-pending" id="statPending">-</div>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon-wrapper progress-icon">⚙️</div>
+          <div>
+            <span class="stat-label">In Progress / Dispatched</span>
+            <div class="stat-value text-progress" id="statProgress">-</div>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon-wrapper resolved-icon">✅</div>
+          <div>
+            <span class="stat-label">Resolved Complaints</span>
+            <div class="stat-value text-resolved" id="statResolved">-</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Map & Controls Section -->
+      <section class="map-section-wrapper">
+        <div class="section-header">
+          <div>
+            <h2>Geographic Grievance Map</h2>
+            <p>Live GPS coordinates of civic reports in Panchayat & Corporation wards</p>
+          </div>
+          <div class="map-legend">
+            <span class="legend-pill pill-pending"><span class="dot"></span> Pending</span>
+            <span class="legend-pill pill-progress"><span class="dot"></span> In Progress</span>
+            <span class="legend-pill pill-resolved"><span class="dot"></span> Resolved</span>
+          </div>
+        </div>
+        <div id="complaintsMap" class="leaflet-map-container"></div>
+      </section>
+
+      <!-- Complaints Management Section -->
+      <section class="complaints-management-section">
+        <div class="management-header">
+          <div>
+            <h2>Priority Complaints Dispatch</h2>
+            <p>Sorted by citizen upvote count (highest community priority first)</p>
+          </div>
+          <div class="filter-controls">
+            <!-- Category Chips -->
+            <div class="category-chips-list" id="categoryChips">
+              <button class="chip active" data-cat="all">All Categories</button>
+              <button class="chip" data-cat="road">🛣️ Road Damage</button>
+              <button class="chip" data-cat="water">💧 Water Leak</button>
+              <button class="chip" data-cat="garbage">🗑️ Garbage Pickup</button>
+              <button class="chip" data-cat="streetlight">💡 Streetlight</button>
+              <button class="chip" data-cat="other">📌 Other</button>
+            </div>
+
+            <!-- Status Filter -->
+            <select id="statusFilterSelect" class="filter-select">
+              <option value="all">All Statuses</option>
+              <option value="pending">Pending Only</option>
+              <option value="in_progress">In Progress Only</option>
+              <option value="resolved">Resolved Only</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Table / Cards List -->
+        <div class="complaints-table-container">
+          <table class="complaints-table">
+            <thead>
+              <tr>
+                <th>Priority / Upvotes</th>
+                <th>Category</th>
+                <th>Description & Location</th>
+                <th>Reported By</th>
+                <th>Date</th>
+                <th>Current Status</th>
+                <th>Action / Update Status</th>
+              </tr>
+            </thead>
+            <tbody id="complaintsTableBody">
+              <tr>
+                <td colspan="7" class="loading-cell">Loading municipal grievances...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Status Change & Resolution Note Modal -->
+    <div id="statusUpdateModal" class="modal-overlay hidden">
+      <div class="modal-card">
+        <div class="modal-badge">Update Grievance Status</div>
+        <h3 id="modalComplaintTitle">Complaint #</h3>
+        <p class="modal-desc" id="modalComplaintDesc"></p>
+
+        <form id="statusUpdateForm">
+          <input type="hidden" id="modalComplaintId">
+          
+          <div class="form-group">
+            <label for="newStatusSelect">Assign New Status</label>
+            <select id="newStatusSelect" class="form-control" required>
+              <option value="pending">Pending (Reviewing)</option>
+              <option value="in_progress">In Progress (Field Team Dispatched)</option>
+              <option value="resolved">Resolved (Work Completed)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="resolutionNoteInput">Resolution / Action Note</label>
+            <textarea id="resolutionNoteInput" rows="3" class="form-control" placeholder="e.g. Repair vehicle dispatched; new LED lamp installed; road patched with bitumen."></textarea>
+            <small class="field-hint">This update note will be sent directly to the citizen who filed the report.</small>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" class="btn btn-secondary" id="cancelModalBtn">Cancel</button>
+            <button type="submit" class="btn btn-primary" id="saveStatusBtn">Save & Notify Citizen</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="app.js"></script>
+</body>
+</html>
