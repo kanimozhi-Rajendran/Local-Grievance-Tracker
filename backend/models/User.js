@@ -18,6 +18,11 @@ const userSchema = new mongoose.Schema(
       trim: true,
       default: 'General Ward',
     },
+    pushToken: {
+      type: String,
+      default: null,
+      trim: true,
+    },
   },
   {
     timestamps: { createdAt: 'createdAt', updatedAt: false },

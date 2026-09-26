@@ -9,6 +9,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <!-- Leaflet CSS for Interactive Map -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <!-- Chart.js for Civic Analytics Dashboard -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -83,7 +85,7 @@
         <div class="stat-card">
           <div class="stat-icon-wrapper pending-icon">⏳</div>
           <div>
-            <span class="stat-label">Pending Action</span>
+            <span class="stat-label">Submitted & Queued</span>
             <div class="stat-value text-pending" id="statPending">-</div>
           </div>
         </div>
@@ -99,78 +101,165 @@
         <div class="stat-card">
           <div class="stat-icon-wrapper resolved-icon">✅</div>
           <div>
-            <span class="stat-label">Resolved Complaints</span>
+            <span class="stat-label">Resolved & Verified</span>
             <div class="stat-value text-resolved" id="statResolved">-</div>
           </div>
         </div>
-      </section>
 
-      <!-- Map & Controls Section -->
-      <section class="map-section-wrapper">
-        <div class="section-header">
+        <div class="stat-card">
+          <div class="stat-icon-wrapper" style="background: #FEE2E2; color: #DC2626;">🚨</div>
           <div>
-            <h2>Geographic Grievance Map</h2>
-            <p>Live GPS coordinates of civic reports in Panchayat & Corporation wards</p>
-          </div>
-          <div class="map-legend">
-            <span class="legend-pill pill-pending"><span class="dot"></span> Pending</span>
-            <span class="legend-pill pill-progress"><span class="dot"></span> In Progress</span>
-            <span class="legend-pill pill-resolved"><span class="dot"></span> Resolved</span>
+            <span class="stat-label">Overdue Escalated</span>
+            <div class="stat-value" style="color: #DC2626;" id="statEscalated">-</div>
           </div>
         </div>
-        <div id="complaintsMap" class="leaflet-map-container"></div>
+
+        <div class="stat-card">
+          <div class="stat-icon-wrapper" style="background: #E0E7FF; color: #4338CA;">⚡</div>
+          <div>
+            <span class="stat-label">Avg Resolution Speed</span>
+            <div class="stat-value" style="color: #4338CA;" id="statAvgSpeed">-</div>
+          </div>
+        </div>
       </section>
 
-      <!-- Complaints Management Section -->
-      <section class="complaints-management-section">
-        <div class="management-header">
-          <div>
-            <h2>Priority Complaints Dispatch</h2>
-            <p>Sorted by citizen upvote count (highest community priority first)</p>
+      <!-- Mode View Toggle (Dispatch Console vs Civic Analytics) -->
+      <section class="view-toggle-bar">
+        <div class="view-toggle-btns">
+          <button id="tabViewDispatch" class="tab-toggle-btn active">
+            <span>🎯 Dispatch Console & Live Map</span>
+          </button>
+          <button id="tabViewAnalytics" class="tab-toggle-btn">
+            <span>📊 Municipal Analytics & SLA Charts</span>
+          </button>
+        </div>
+        <div class="live-pulse">
+          <span class="pulse-dot"></span>
+          <span>Live Municipal Synchronization</span>
+        </div>
+      </section>
+
+      <!-- VIEW 1: Dispatch Console Section -->
+      <div id="viewDispatchSection">
+        
+        <!-- Live Geographic Map of Grievances -->
+        <section class="map-section-card">
+          <div class="map-card-header">
+            <div>
+              <h3>🗺️ Geographic Grievance Density & Status Map</h3>
+              <p class="section-sub">Color-coded markers: Red (Submitted), Blue (Acknowledged), Yellow (In Progress), Green (Resolved), Purple (Escalated)</p>
+            </div>
           </div>
-          <div class="filter-controls">
-            <!-- Category Chips -->
-            <div class="category-chips-list" id="categoryChips">
+          <div id="complaintsMap" class="leaflet-map-wrapper"></div>
+        </section>
+
+        <!-- Filter Bar & Complaints Management Table -->
+        <section class="management-section">
+          
+          <div class="filters-header">
+            <div class="chips-group" id="categoryChips">
               <button class="chip active" data-cat="all">All Categories</button>
               <button class="chip" data-cat="road">🛣️ Road Damage</button>
               <button class="chip" data-cat="water">💧 Water Leak</button>
-              <button class="chip" data-cat="garbage">🗑️ Garbage Pickup</button>
+              <button class="chip" data-cat="garbage">🗑️ Garbage Dump</button>
               <button class="chip" data-cat="streetlight">💡 Streetlight</button>
               <button class="chip" data-cat="other">📌 Other</button>
             </div>
 
-            <!-- Status Filter -->
-            <select id="statusFilterSelect" class="filter-select">
-              <option value="all">All Statuses</option>
-              <option value="pending">Pending Only</option>
-              <option value="in_progress">In Progress Only</option>
-              <option value="resolved">Resolved Only</option>
-            </select>
+            <div class="filter-controls-right">
+              <!-- Sorting Filter -->
+              <div class="search-input-wrapper">
+                <select id="sortBySelect" class="filter-select">
+                  <option value="priority">Sort by: Priority (Upvotes)</option>
+                  <option value="deadline">Sort by: SLA Deadline (Urgent)</option>
+                  <option value="recent">Sort by: Newest First</option>
+                  <option value="oldest">Sort by: Oldest First</option>
+                </select>
+              </div>
+
+              <!-- Ward / Locality Filter -->
+              <select id="wardFilterSelect" class="filter-select">
+                <option value="all">All Wards / Zones</option>
+                <option value="Ward 2">Ward 2 (Market Road)</option>
+                <option value="Ward 4">Ward 4 (North Bazar)</option>
+                <option value="Ward 7">Ward 7 (Railway Border)</option>
+                <option value="Ward 12">Ward 12 (Gandhi Road)</option>
+                <option value="Ward 18">Ward 18 (Lakeview)</option>
+              </select>
+
+              <!-- Status Filter -->
+              <select id="statusFilterSelect" class="filter-select">
+                <option value="all">All Statuses</option>
+                <option value="submitted">Submitted Only</option>
+                <option value="acknowledged">Acknowledged Only</option>
+                <option value="in_progress">In Progress Only</option>
+                <option value="resolved">Resolved Only</option>
+                <option value="rejected">Rejected Only</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Table / Cards List -->
+          <div class="complaints-table-container">
+            <table class="complaints-table">
+              <thead>
+                <tr>
+                  <th>Priority</th>
+                  <th>Category</th>
+                  <th>Description & Location</th>
+                  <th>SLA Deadline</th>
+                  <th>Reported By</th>
+                  <th>Status & Escalation</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="complaintsTableBody">
+                <tr>
+                  <td colspan="7" class="loading-cell">Loading municipal grievances...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+
+      <!-- VIEW 2: Analytics Dashboard Section -->
+      <div id="viewAnalyticsSection" class="hidden">
+        <div class="analytics-grid">
+          <!-- Category Bar Chart -->
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3>📊 Grievances by Category</h3>
+              <span class="chart-tag">Distribution</span>
+            </div>
+            <div class="chart-body">
+              <canvas id="categoryChart"></canvas>
+            </div>
+          </div>
+
+          <!-- Status Donut Chart -->
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3>🍩 Status Resolution Ratio</h3>
+              <span class="chart-tag">Progress</span>
+            </div>
+            <div class="chart-body">
+              <canvas id="statusChart"></canvas>
+            </div>
+          </div>
+
+          <!-- 30-Day Timeline Line Chart -->
+          <div class="chart-card full-width-chart">
+            <div class="chart-header">
+              <h3>📈 30-Day Complaint Filing Trend</h3>
+              <span class="chart-tag">Daily Volume</span>
+            </div>
+            <div class="chart-body">
+              <canvas id="timelineChart"></canvas>
+            </div>
           </div>
         </div>
-
-        <!-- Table / Cards List -->
-        <div class="complaints-table-container">
-          <table class="complaints-table">
-            <thead>
-              <tr>
-                <th>Priority / Upvotes</th>
-                <th>Category</th>
-                <th>Description & Location</th>
-                <th>Reported By</th>
-                <th>Date</th>
-                <th>Current Status</th>
-                <th>Action / Update Status</th>
-              </tr>
-            </thead>
-            <tbody id="complaintsTableBody">
-              <tr>
-                <td colspan="7" class="loading-cell">Loading municipal grievances...</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
+      </div>
 
     </main>
 
@@ -187,16 +276,28 @@
           <div class="form-group">
             <label for="newStatusSelect">Assign New Status</label>
             <select id="newStatusSelect" class="form-control" required>
-              <option value="pending">Pending (Reviewing)</option>
+              <option value="acknowledged">Acknowledged (Accepted by Ward Officer)</option>
               <option value="in_progress">In Progress (Field Team Dispatched)</option>
-              <option value="resolved">Resolved (Work Completed)</option>
+              <option value="resolved">Resolved (Work Completed with Proof)</option>
+              <option value="rejected">Rejected (Not Feasible / Out of Jurisdiction)</option>
             </select>
           </div>
 
+          <div class="form-group" id="rejectionReasonGroup" style="display: none;">
+            <label for="rejectionReasonInput" style="color: #DC2626;">Rejection Reason (Mandatory)</label>
+            <textarea id="rejectionReasonInput" rows="2" class="form-control" placeholder="Provide mandatory explanation why grievance is rejected..."></textarea>
+          </div>
+
+          <div class="form-group" id="resolutionPhotoGroup">
+            <label for="resolutionPhotoInput">Proof of Fix (Resolution "After" Photo URL)</label>
+            <input type="text" id="resolutionPhotoInput" class="form-control" placeholder="https://images.unsplash.com/... (Mandatory for Resolved)">
+            <small class="field-hint">Displayed alongside original photo for citizen verification.</small>
+          </div>
+
           <div class="form-group">
-            <label for="resolutionNoteInput">Resolution / Action Note</label>
-            <textarea id="resolutionNoteInput" rows="3" class="form-control" placeholder="e.g. Repair vehicle dispatched; new LED lamp installed; road patched with bitumen."></textarea>
-            <small class="field-hint">This update note will be sent directly to the citizen who filed the report.</small>
+            <label for="resolutionNoteInput">Resolution / Dispatch Note</label>
+            <textarea id="resolutionNoteInput" rows="3" class="form-control" placeholder="e.g. Pipeline replaced; 5 tons garbage cleared; road patched with bitumen."></textarea>
+            <small class="field-hint">Sent directly as push & SMS notification to the citizen.</small>
           </div>
 
           <div class="modal-actions">

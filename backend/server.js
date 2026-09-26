@@ -9,6 +9,7 @@ const complaintRoutes = require('./routes/complaints');
 const adminRoutes = require('./routes/admin');
 const seedData = require('./seeds/seed');
 const Complaint = require('./models/Complaint');
+const { checkAndAutoEscalateComplaints } = require('./services/escalationService');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -83,12 +84,24 @@ const startServer = async () => {
       await seedData();
     }
 
+    // Initial auto-escalation check & background timer (Item #3)
+    await checkAndAutoEscalateComplaints();
+    const ESCALATION_CHECK_INTERVAL_MS = 60 * 1000; // Check every 60 seconds
+    setInterval(async () => {
+      try {
+        await checkAndAutoEscalateComplaints();
+      } catch (escErr) {
+        console.error('[SLA Background Job Error]', escErr.message);
+      }
+    }, ESCALATION_CHECK_INTERVAL_MS);
+
     app.listen(PORT, () => {
       console.log(`\n======================================================`);
       console.log(`🚀 Local Grievance Tracker API running on port ${PORT}`);
       console.log(`📡 Base API URL: http://localhost:${PORT}/api`);
       console.log(`🏛️ Admin Web Panel: http://localhost:${PORT}/admin`);
       console.log(`💚 Health Check: http://localhost:${PORT}/api/health`);
+      console.log(`⏱️ SLA Auto-Escalation Engine active (Every 60s)`);
       console.log(`======================================================\n`);
     });
   } catch (err) {

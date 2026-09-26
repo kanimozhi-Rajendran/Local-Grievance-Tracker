@@ -3,6 +3,7 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { protectCitizen, JWT_SECRET } = require('../middleware/auth');
+const { sendSMS } = require('../services/sms');
 
 // In-memory OTP storage: phone -> { otp, expiresAt }
 const otpStore = new Map();
@@ -23,23 +24,23 @@ router.post('/send-otp', async (req, res) => {
     }
 
     const cleanPhone = String(phone).replace(/\s+/g, '');
-    // Generate a 6-digit OTP (or fixed 123456 for ultra-reliable testing)
+    // Generate a 6-digit OTP with 5-minute expiry
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes validity
 
     otpStore.set(cleanPhone, { otp, expiresAt });
 
-    console.log(`\n========================================`);
-    console.log(`[SMS Gateway Mock] OTP for ${cleanPhone} is: ${otp}`);
-    console.log(`========================================\n`);
+    const smsText = `Your Local Grievance Tracker verification code is: ${otp}. Valid for 5 minutes. Do not share this code.`;
+    const smsResult = await sendSMS(cleanPhone, smsText);
 
-    // In a real production environment with Twilio/Fast2SMS, you would trigger SMS API here.
-    // For local portfolio testing, we return the OTP in the response body so test users can log in effortlessly.
     return res.status(200).json({
       success: true,
-      message: `OTP sent successfully to ${cleanPhone}`,
-      otp, // Convenient for automated testing & student demo
+      message: smsResult.isRealSMS
+        ? `Verification code sent via SMS to ${cleanPhone}`
+        : `OTP generated for ${cleanPhone} (Development mock mode)`,
+      otp, // Provided for easy development / automated test verification
       expiresIn: 300,
+      isRealSMS: smsResult.isRealSMS,
     });
   } catch (err) {
     console.error('[Send OTP Error]', err);
@@ -160,6 +161,33 @@ router.put('/profile', protectCitizen, async (req, res) => {
     });
   } catch (err) {
     return res.status(500).json({ success: false, message: 'Error updating profile.' });
+  }
+});
+
+/**
+ * @route   PUT /api/auth/push-token
+ * @desc    Save/update device Expo push token for logged-in citizen
+ */
+router.put('/push-token', protectCitizen, async (req, res) => {
+  try {
+    const { pushToken } = req.body;
+    if (!pushToken) {
+      return res.status(400).json({ success: false, message: 'pushToken is required' });
+    }
+
+    req.user.pushToken = String(pushToken).trim();
+    await req.user.save();
+
+    console.log(`[Push Notification] Registered push token for ${req.user.name}: ${req.user.pushToken}`);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Push token registered successfully',
+      pushToken: req.user.pushToken,
+    });
+  } catch (err) {
+    console.error('[Push Token Error]', err);
+    return res.status(500).json({ success: false, message: 'Error saving push token.' });
   }
 });
 
